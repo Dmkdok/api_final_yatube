@@ -11,6 +11,13 @@ class Post(models.Model):
         User, on_delete=models.CASCADE, related_name='posts'
     )
     image = models.ImageField(upload_to='posts/', null=True, blank=True)
+    group = models.ForeignKey(
+        'Group',
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='posts',
+    )
 
     def __str__(self):
         return self.text
@@ -29,17 +36,33 @@ class Comment(models.Model):
     )
 
 
+class Group(models.Model):
+    title = models.CharField(max_length=200)
+    slug = models.SlugField(unique=True, max_length=50)
+    description = models.TextField()
+
+    def __str__(self):
+        return self.title
+
+
 class Follow(models.Model):
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='follower'
+        User, on_delete=models.CASCADE, related_name='user_follows'
     )
     following = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='following'
+        User, on_delete=models.CASCADE, related_name='following_follows'
     )
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'following'], name='unique_follow'
-            )
+            ),
+            models.CheckConstraint(
+                check=~models.Q(user=models.F('following')),
+                name='prevent_self_follow',
+            ),
         ]
+
+    def __str__(self):
+        return f'{self.user} follows {self.following}'
