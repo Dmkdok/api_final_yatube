@@ -1,8 +1,14 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import filters, mixins, pagination, viewsets
+from rest_framework import filters, pagination
+from rest_framework.mixins import CreateModelMixin, ListModelMixin
 from rest_framework.permissions import (
     IsAuthenticated,
     IsAuthenticatedOrReadOnly,
+)
+from rest_framework.viewsets import (
+    GenericViewSet,
+    ModelViewSet,
+    ReadOnlyModelViewSet,
 )
 
 from posts.models import Group, Post
@@ -15,7 +21,7 @@ from .serializers import (
 )
 
 
-class PostViewSet(viewsets.ModelViewSet):
+class PostViewSet(ModelViewSet):
     """ViewSet для управления постами."""
 
     queryset = Post.objects.all()
@@ -28,7 +34,7 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer.save(author=self.request.user)
 
 
-class GroupViewSet(viewsets.ReadOnlyModelViewSet):
+class GroupViewSet(ReadOnlyModelViewSet):
     """ViewSet для просмотра групп."""
 
     queryset = Group.objects.all()
@@ -36,28 +42,29 @@ class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
 
-class CommentViewSet(viewsets.ModelViewSet):
+class CommentViewSet(ModelViewSet):
     """ViewSet для управления комментариями."""
 
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
 
+    def get_post(self):
+        """Получение объекта поста."""
+        post_id = self.kwargs.get('post_id')
+        return get_object_or_404(Post, pk=post_id)
+
     def get_queryset(self):
         """Получение queryset для комментариев к определенному посту."""
-        post_id = self.kwargs.get('post_id')
-        post = get_object_or_404(Post, pk=post_id)
+        post = self.get_post()
         return post.comments.all()
 
     def perform_create(self, serializer):
         """Сохранение автора и поста при создании комментария."""
-        post_id = self.kwargs.get('post_id')
-        post = get_object_or_404(Post, pk=post_id)
+        post = self.get_post()
         serializer.save(author=self.request.user, post=post)
 
 
-class FollowViewSet(
-    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
-):
+class FollowViewSet(CreateModelMixin, ListModelMixin, GenericViewSet):
     """ViewSet для управления подписками."""
 
     serializer_class = FollowSerializer
